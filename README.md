@@ -11,7 +11,7 @@ downloaded from [here](<https://github.com/ggreer/the_silver_searcher>)
 
 **Setup** :
 
-run mysql server :
+<i>run mysql server</i> :
 
 mysqld —datadir=/path/to/loaded/database —skip-grant-tables
 
@@ -21,6 +21,5 @@ mysqld —datadir=/path/to/loaded/database —skip-grant-tables
 
  
 
-connect to mysql server :
-
+<i>connect to mysql server</i> :
 mysql -u root
