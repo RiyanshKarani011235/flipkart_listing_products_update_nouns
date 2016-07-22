@@ -13,10 +13,11 @@ downloaded from [here](<https://github.com/ggreer/the_silver_searcher>)
 
 run mysql server :
 
-mysql —datadir=/path/to/loaded/database —skip-grant-tables
+mysqld —datadir=/path/to/loaded/database —skip-grant-tables
 
-mysqld --datadir=/volumes/jarvis/projects\_working\_directory/scandid/data
---skip-grant-tables
+(in my case : mysqld
+--datadir=/volumes/jarvis/projects\_working\_directory/scandid/data
+--skip-grant-tables)
 
  
 
