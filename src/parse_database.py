@@ -42,7 +42,7 @@ mysql_comm.run_mysql_command(cursor, 'SHOW TABLES')
 
 
 #####################################################################
-# CALCULATING NUMBER OF ROWS IN THE "flipkart_listing_products_table"
+# CALCULATING NUMBER OF ROWS IN THE "flipkart_listing_products" TABLE
 #####################################################################
 
 # uncomment the part below if you don't know the number of rows in the table
@@ -55,8 +55,25 @@ mysql_comm.run_mysql_command(cursor, 'SHOW TABLES')
 # number_of_products = int(mysql_comm.run_mysql_command(cursor, 'SELECT COUNT(*) FROM flipkart_listing_products', print_output=False))
 # print('\tnumber of rows --> ' + number_of_products)
 
+def remove_file(filename, supress_output=False) : 
+	try : 
+		os.remove(filename)
+	except OSError as e : 
+		if not supress_output : 
+			print(e)
 
 def load_data_without_nouns() : 
+	'''
+	stores breadcrumbs, urls and corresponding id's for products without nouns
+	in breadcrumbs_file, urls_file and ids_file respectively
+	
+	:expects: 
+		None
+	:returns:
+		None
+	'''
+
+	print("Log : load_data_without_nouns : started")
 	####################
 	# FILE DECLARATIONS
 	####################
@@ -79,53 +96,62 @@ def load_data_without_nouns() :
 
 	ids_file = working_directory + 'data/incorrect_nouns/ids.txt'					# used for storing id's for
 																					# corresponding products 
+	# cleaning files
+	remove_file(mysql_output_file, supress_output=True)
+	remove_file(ag_output_file)
+	remove_file(breadcrumbs_file)
+	remove_file(urls_file)
+	remove_file(ids_file)
 
-	# cleaning up data files
-	os.system('rm ' + mysql_output_file)
-	os.system('rm ' + ag_output_file)
-	os.system('rm ' + breadcrumbs_file)
-	os.system('rm ' + urls_file)
-	os.system('rm' + ids_file)
-
-	###############################################################################################
-	# OBTAINING PRODUCTS FROM "flipkart_listing_products" TABLE WHICH DO NOT HAVE A NOUN ASSOCIATED
-	###############################################################################################
+	####################################################################################################
+	# OBTAINING PRODUCT PMI's FROM "flipkart_listing_products" TABLE WHICH DO NOT HAVE A NOUN ASSOCIATED
+	####################################################################################################
 
 	# the pmi's for the proucts not having a noun are stored in the file "ag_output_file.txt, along with their id's"
-	print('reading products with no nouns associated\n\t...')
+	print('Log : load_data_without_nouns : reading products with no nouns associated\n\t...')
 	i = 0
 
 	# initializing initial value of j
-	j = 1
-	while number_of_products/j > 10 :
-		j *= 10
+	j = 1000000
+	# while number_of_products/j > 10 :
+	# 	j *= 10
 
+	# maximizing the amount of data read from the mysql server in one query
+	# since fetching data from the server is computationally expensive
 	while j > 0 : 
-		while i < 740826729 :
-			mysql_command = 'select id, pmi from ' + table_name + ' where id >= ' + str(i) + ' and id < ' + str(i + 100000) + ' into outfile "' + mysql_output_file + '"'
+		while i < number_of_products :
+			mysql_command = 'select id, pmi from ' + table_name + ' where id >= ' + str(i) + ' and id < ' + str(i + j) + ' into outfile "' + mysql_output_file + '"'
 			mysql_comm.run_mysql_command(cursor, mysql_command, print_output=False)	
 			i += j
 			os.system("ag -v '\"noun\"' " + mysql_output_file + " >> " + ag_output_file)
 			os.system('rm ' + mysql_output_file)
-			print('\treading upto id : ' + str(i))
+			print_string = '\treading upto id : ' + str(i) + ' / ' + str(number_of_products) 
+			print(print_string, end='\r')
+			sys.stdout.flush()
 		i -= j
 		j = j / 10
-	print('\tdone')
 
 	#################################################################################
 	# OBTAINING NOUNS AND BREADCRUMBS FOR PRODUCTS WHICH DO NOT HAVE NOUNS ASSOCIATED
 	#################################################################################
 
-	print('getting associated breadcrumbs and urls\n\t...')
+	print('Log : load_data_without_nouns : Loading breadcrumbs and urls\n\t...')
+	os.system("ag -o '\"breadcrumbs[^\]]*\]' " + ag_output_file  + " >> " + breadcrumbs_file)
+	os.system("ag -o '\"url\":\"[^\"]*\"' " + ag_output_file + " >> " + urls_file)
+
+	##########################################################
+	# OBTAINING AND STORING CORRESPONDING ID's IN THE IDS FILE
+	##########################################################
+
+	print('Log : load_data_without_nouns : getting associated ids\n\t...')
 	number_of_products_without_nouns = ''
 	with open(ag_output_file, 'r') as f : 
 		number_of_products_without_nouns = len(f.read().split('\n'))
-	print('number of products without nouns : ' + str(number_of_products_without_nouns))
 	with open(ag_output_file, 'r') as f :
 		ids = [] 
 		lines = f.read().split('\n')
 		for line in lines : 
-			ids.append(line.split('\t')[0])
+			ids.append(line.split('\t')[0].split(':')[-1])
 		print("\tgot the ids")
 
 		with open(ids_file, 'w') as f :
@@ -133,28 +159,40 @@ def load_data_without_nouns() :
 		with open(ids_file, 'a') as f : 
 			for id in ids : 
 				f.write(str(id) + '\n') 
+		
 		print('\tdone writing ids to ids_file')
+		# print('Log : load_data_without_nouns : getting breadcrumbs and urls')
+		# count = 0
+		# for id in ids : 
+		# 	mysql_command = 'select pmi from flipkart_listing_products where id = ' + str(id) + ' into outfile "' + mysql_output_file + '"'
+		# 	mysql_comm.run_mysql_command(cursor, mysql_command, print_output=False)
+		# 	# if you get an error here, please install "ag (the silver searcher)"
+		# 	os.system("ag -o '\"breadcrumbs[^\]]*\]' " + mysql_output_file  + " >> " + breadcrumbs_file)
+		# 	os.system("ag -o '\"url\":\"[^\"]*\"' " + mysql_output_file + " >> " + urls_file)
+		# 	os.system('rm ' + mysql_output_file)
+		# 	count += 1
+		# 	print('\t' + str(count) + ' / ' + str(number_of_products_without_nouns), end='\r')
+		# 	sys.stdout.flush()
 
-		count = 0
-		for id in ids : 
-			mysql_command = 'select pmi from flipkart_listing_products where id = ' + str(id) + ' into outfile "' + mysql_output_file + '"'
-			mysql_comm.run_mysql_command(cursor, mysql_command, print_output=False)
-			# if you get an error here, please install "ag (the silver searcher)"
-			os.system("ag -o '\"breadcrumbs[^\]]*\]' " + mysql_output_file  + " >> " + breadcrumbs_file)
-			os.system("ag -o '\"url\":\"[^\"]*\"' " + mysql_output_file + " >> " + urls_file)
-			os.system('rm ' + mysql_output_file)
-			count += 1
-			print('\t' + str(count) + ' / ' + str(number_of_products_without_nouns))
-			# if(count == 1000) :
-			# 	print('\t' + str(id) + ' / ' + str(number_of_products))
-			# 	count = 0
-
-	print('hansel and gratel would be proud')
+	print('Log : load_data_without_nouns number of products without nouns : ' + str(number_of_products_without_nouns))
+	print('Log : load_data_without_nouns : DONE')
 
 def load_data_with_nouns() : 
+	'''
+	stores nouns, breadcrumbs and corresponding id's for products with nouns
+	in nouns_file, breadcrumbs_file and ids_file respectively
+	
+	:expects: 
+		None
+	:returns:
+		None
+	'''
+
 	###################
 	# FILE DECLARATIONS
 	###################
+
+	print('Log : load_data_with_nouns : starting')
 
 	# store in a location where it can be accessed the fastest
 	mysql_output_file = working_directory + 'data/correct_nouns/mysql_output.txt'	# temporary file used to store
@@ -172,17 +210,18 @@ def load_data_with_nouns() :
 																					# correspoonding products
 
 	# cleaning files
-	os.system('rm ' + mysql_output_file)
-	os.system('rm ' + ag_output_file)
-	os.system('rm ' + breadcrumbs_file)
-	os.system('rm ' + nouns_file)
+	remove_file(mysql_output_file, supress_output=True)
+	remove_file(ag_output_file)
+	remove_file(breadcrumbs_file)
+	remove_file(nouns_file)
+	remove_file(ids_file)
 
-	###########################################################################################
-	# OBTAINING PRODUCTS FROM "flipkart_listing_products" TABLE WHICH DO HAVE A NOUN ASSOCIATED
-	###########################################################################################
+	################################################################################################
+	# OBTAINING PRODUCT PMI's FROM "flipkart_listing_products" TABLE WHICH DO HAVE A NOUN ASSOCIATED
+	################################################################################################
 
 	# the pmi's for the proucts not having a noun are stored in the file "ag_output_file.txt, along with their id's"
-	print('reading products with nouns associated\n\t...')
+	print('Log : load_data_with_nouns : reading products with nouns associated\n\t...')
 	i = 0
 
 	# initializing initial value of j
@@ -190,45 +229,44 @@ def load_data_with_nouns() :
 	while number_of_products/j > 10 :
 		j *= 10
 
-
+	# maximizing the amount of data read from the mysql server in one query
+	# since fetching data from the server is computationally expensive
 	while j > 0 : 
-		while i < 740826729 :
-			mysql_command = 'select id, pmi from ' + table_name + ' where id >= ' + str(i) + ' and id < ' + str(i + 100000) + ' into outfile "' + mysql_output_file + '"'
+		while i < number_of_products :
+			mysql_command = 'select id, pmi from ' + table_name + ' where id >= ' + str(i) + ' and id < ' + str(i + j) + ' into outfile "' + mysql_output_file + '"'
 			mysql_comm.run_mysql_command(cursor, mysql_command, print_output=False)	
 			i += j
 			os.system("ag '\"noun\"' " + mysql_output_file + " >> " + ag_output_file)
-			# with open(temp_file, 'r') as f : 
-			# 	os.system("echo '" + f.read() + "'' >> " + ag_output_file)
-			# try : 
-			# 	os.remove(output_file)
-			# except OSError : 
-			# 	pass
-			os.system("ag -o '\"noun\":[^:]*\",' " + ag_output_file + " >> " + nouns_file)
-			os.system("ag -o '\"breadcrumbs[^\]]*\]' " + ag_output_file  + " >> " + breadcrumbs_file)
 			os.system('rm ' + mysql_output_file)
-			print('\treading upto id : ' + str(i))
+			print_string = '\treading upto id : ' + str(i) + ' / ' + str(number_of_products) 
+			print(print_string, end='\r')
+			sys.stdout.flush()
 		i -= j
 		j = j / 10
-	print('\tdone')
 
 	#############################################################################
 	# OBTAINING NOUNS AND BREADCRUMBS FOR PRODUCTS WHICH DO HAVE NOUNS ASSOCIATED
 	#############################################################################
 
-	print('getting associated breadcrumbs and urls\n\t...')
+	print('Log : load_data_without_nouns : Loading breadcrumbs and urls\n\t...')
+	os.system("ag -o '\"noun\":[^:]*\",' " + ag_output_file + " >> " + nouns_file)
+	os.system("ag -o '\"breadcrumbs[^\]]*\]' " + ag_output_file  + " >> " + breadcrumbs_file)
+
+	##########################################################
+	# OBTAINING AND STORING CORRESPONDING ID's IN THE IDS FILE
+	##########################################################
+
+	print('Log : load_data_with_nouns : getting associated ids\n\t...')
 	number_of_products_without_nouns = ''
 	with open(ag_output_file, 'r') as f : 
 		number_of_products_without_nouns = len(f.read().split('\n'))
-	print('number of products without nouns : ' + str(number_of_products_without_nouns))
+	print('Log : load_data_with_nouns : number of products with nouns : ' + str(number_of_products_without_nouns))
 	with open(ag_output_file, 'r') as f :
 		ids = [] 
 		lines = f.read().split('\n')
 		for line in lines : 
-			ids.append(line.split('\t')[0])
+			ids.append(line.split('\t')[0].split(':')[-1])
 
-	############################################
-	# STORING CORRESPONDING ID's IN THE IDS FILE
-	############################################
 	try : 
 		os.remove(ids_file)
 	except OSError : 
@@ -237,22 +275,4 @@ def load_data_with_nouns() :
 		for id in ids : 
 			f.write(str(id) + '\n')
 
-		# # print(ids)
-		# print("\tgot the ids")
-		# count = 0
-		# for id in ids : 
-		# 	mysql_command = 'select pmi from flipkart_listing_products where id = ' + str(id) + ' into outfile "' + mysql_output_file + '"'
-		# 	mysql_comm.run_mysql_command(cursor, mysql_command, print_output=False)
-		# 	# if you get an error here, please install "ag (the silver searcher)"
-		# 	os.system("ag -o '\"breadcrumbs[^\]]*\]' " + mysql_output_file  + " >> " + breadcrumbs_file)
-		# 	os.system("ag -o '\"url\":\"[^\"]*\"' " + mysql_output_file + " >> " + urls_file)
-		# 	os.system('rm ' + mysql_output_file)
-		# 	count += 1
-		# 	print('\t' + str(count) + ' / ' + str(number_of_products_without_nouns))
-		# 	# if(count == 1000) :
-		# 	# 	print('\t' + str(id) + ' / ' + str(number_of_products))
-		# 	# 	count = 0
-
-	print('hansel and gratel would be proud')
-
-	''' ---------------------------------------------------------------------------------------------------- '''
+	print('Log : load_data_with_nouns : done')
