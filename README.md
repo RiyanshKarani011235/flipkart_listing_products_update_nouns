@@ -22,4 +22,5 @@ mysqld —datadir=/path/to/loaded/database —skip-grant-tables
  
 
 <i>connect to mysql server</i> :
+
 mysql -u root
