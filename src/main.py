@@ -18,19 +18,20 @@ for element in os.path.realpath(__file__).split(path_separator)[:-depth] :
 print('Log : working directory : ' + working_directory)
 os.chdir(working_directory)
 
+if not os.path.exists(os.path.join(working_directory, 'data')) : 
+	print('initializing data directory')
+	os.mkdir(os.path.join(working_directory, 'data'))
+if not os.path.exists(os.path.join(working_directory, 'data', 'incorrect_nouns')) : 
+	os.mkdir(os.path.join(working_directory, 'data', 'incorrect_nouns'))
+if not os.path.exists(os.path.join(working_directory, 'data', 'correct_nouns')) :
+	os.mkdir(os.path.join(working_directory, 'data', 'correct_nouns'))
+
 __init__.working_directory = working_directory
 __init__.database_name = 'test'
 __init__.table_name = 'flipkart_listing_products'
 
 import parse_database_mark2
+
 parse_database_mark2.load_data()
-# parse_database.load_data_without_nouns() 	# obtain breadcrumbs, url's, and
-# 											# and corresponding id's for 
-# 											# products without nouns
-
-# parse_database.load_data_with_nouns()		# obtain nouns, breadcrumbs and
-# 											# and corresponding id's for 
-# 											# products with nouns
-
-# import update_breadcrumbs
-# import create_breadcrumbs_nouns_dictionary
+import update_breadcrumbs
+import create_breadcrumbs_nouns_dictionary

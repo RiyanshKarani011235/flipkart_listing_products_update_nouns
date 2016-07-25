@@ -24,3 +24,12 @@ mysqld —datadir=/path/to/loaded/database —skip-grant-tables
 <i>connect to mysql server</i> :
 
 mysql -u root
+
+
+**Run** : 
+
+clone this repository
+
+cd /path/to/diretory/where/this/repo/is/store/name_of_the_cloned_repository
+
+python src/main.py

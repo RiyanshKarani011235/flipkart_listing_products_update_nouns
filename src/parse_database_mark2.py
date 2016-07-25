@@ -94,6 +94,8 @@ def load_data() :
 																									# breadcrumbs in the case none are
 																									# available
 
+	incorrect_nouns_output_file = working_directory + 'data/incorrect_nouns/output.txt'
+
 	incorrect_nouns_ids_file = working_directory + 'data/incorrect_nouns/ids.txt'					# used for storing id's for
 																									# corresponding products 
 
@@ -110,33 +112,39 @@ def load_data() :
 
 	correct_nouns_ids_file = working_directory + 'data/correct_nouns/ids.txt'						# used for storing id's for 
 																									# correspoonding products
+
+	correct_nouns_output_file = working_directory + 'data/correct_nouns/output.txt'
+
 	# cleaning files
 	remove_file(incorrect_nouns_mysql_output_file, supress_output=True)
 	remove_file(incorrect_nouns_ag_output_file)
 	remove_file(incorrect_nouns_breadcrumbs_file)
 	remove_file(incorrect_nouns_urls_file)
 	remove_file(incorrect_nouns_ids_file)
+	remove_file(incorrect_nouns_output_file)
 
 	remove_file(correct_nouns_mysql_output_file, supress_output=True)
 	remove_file(correct_nouns_ag_output_file)
 	remove_file(correct_nouns_breadcrumbs_file)
 	remove_file(correct_nouns_nouns_file)
 	remove_file(correct_nouns_ids_file)
+	remove_file(correct_nouns_output_file)
 
 	####################################################################################################
 	# OBTAINING PRODUCT PMI's FROM "flipkart_listing_products" TABLE WHICH DO NOT HAVE A NOUN ASSOCIATED
 	####################################################################################################
 
 	# the pmi's for the proucts not having a noun are stored in the file "incorrect_nouns_ag_output_file.txt, along with their id's"
-	print('Log : load_data_without_nouns : reading products with no nouns associated\n\t...')
+	print('Log : load_data_without_nouns : reading products\n\t...')
 	i = 0
 
 	# initializing initial value of j
 	j_max = 1000000
-	while number_of_products/j > 10 :
-		j *= 10
-	if j > j_max : 
-		j = j_max
+	j = 1
+	# while number_of_products/j > 10 :
+	# 	j *= 10
+	# if j > j_max : 
+	# 	j = j_max
 
 	# maximizing the amount of data read from the mysql server in one query
 	# since fetching data from the server is computationally expensive
@@ -151,11 +159,35 @@ def load_data() :
 			#################################################################################
 			# OBTAINING NOUNS AND BREADCRUMBS FOR PRODUCTS WHICH DO NOT HAVE NOUNS ASSOCIATED
 			#################################################################################
+			incorrect_nouns_breadcrumbs_command = "var=$(ag -o '\"breadcrumbs[^\]]*\]' " + incorrect_nouns_ag_output_file
+			incorrect_nouns_breadcrumbs_command += ") && echo $var >> " + incorrect_nouns_breadcrumbs_file
+			incorrect_nouns_breadcrumbs_command += " && echo \"id=$var ,\" >> " + incorrect_nouns_output_file
 
-			os.system("ag -o '\"breadcrumbs[^\]]*\]' " + incorrect_nouns_ag_output_file  + " >> " + incorrect_nouns_breadcrumbs_file)
+			correct_nouns_breadcrumbs_command = "var=$(ag -o '\"breadcrumbs[^\]]*\]' " + correct_nouns_ag_output_file
+			correct_nouns_breadcrumbs_command += ") && echo $var >> " + correct_nouns_breadcrumbs_file
+			correct_nouns_breadcrumbs_command += " && echo \"id=$var ,\" >> " + correct_nouns_output_file
+
+			os.system(incorrect_nouns_breadcrumbs_command)
+			os.system(correct_nouns_breadcrumbs_command)
+			
+			if i == 3 : 
+				raise SystemExit(0)
+			else : 
+				print(i)
+
+			os.system("var=$(ag -o '\"breadcrumbs[^\]]*\]' " + incorrect_nouns_ag_output_file  + ") && echo $var >> " + incorrect_nouns_breadcrumbs_file + "")
 			os.system("ag -o '\"url\":\"[^\"]*\"' " + incorrect_nouns_ag_output_file + " >> " + incorrect_nouns_urls_file)
 			os.system("ag -o '\"noun\":[^:]*\",' " + correct_nouns_ag_output_file + " >> " + correct_nouns_nouns_file)
 			os.system("ag -o '\"breadcrumbs[^\]]*\]' " + correct_nouns_ag_output_file  + " >> " + correct_nouns_breadcrumbs_file)
+			
+			##########################################################
+			# OBTAINING AND STORING CORRESPONDING ID's IN THE IDS FILE
+			##########################################################
+
+			os.system("ag -o ':.*\t{\"id' " + incorrect_nouns_ag_output_file + " | ag -o ':.*\t' | ag -o '[^:]*\t' >> " + incorrect_nouns_ids_file)
+			os.system("ag -o ':.*\t{\"id' " + correct_nouns_ag_output_file + " | ag -o ':.*\t' | ag -o '[^:]*\t' >> " + correct_nouns_ids_file)
+
+			# Cleaning up before next iteration and printing
 			remove_file(incorrect_nouns_ag_output_file)
 			remove_file(correct_nouns_ag_output_file)
 			remove_file(incorrect_nouns_mysql_output_file)
@@ -165,49 +197,46 @@ def load_data() :
 		i -= j
 		j = j / 10
 
-	print('Log : load_data_without_nouns : Loading breadcrumbs and urls\n\t...')
+	# print('Log : load_data_without_nouns : Loading breadcrumbs and urls\n\t...')
 
-	##########################################################
-	# OBTAINING AND STORING CORRESPONDING ID's IN THE IDS FILE
-	##########################################################
 
-	print('Log : load_data_without_nouns : getting associated ids\n\t...')
+	# print('Log : load_data_without_nouns : getting associated ids\n\t...')
 
-	number_of_products_without_nouns = ''
-	with open(incorrect_nouns_ag_output_file, 'r') as f : 
-		number_of_products_without_nouns = len(f.read().split('\n'))
-	with open(incorrect_nouns_ag_output_file, 'r') as f :
-		ids = [] 
-		lines = f.read().split('\n')
-		for line in lines : 
-			ids.append(line.split('\t')[0].split(':')[-1])
-		print("\tgot the ids")
+	# number_of_products_without_nouns = ''
+	# with open(incorrect_nouns_ag_output_file, 'r') as f : 
+	# 	number_of_products_without_nouns = len(f.read().split('\n'))
+	# with open(incorrect_nouns_ag_output_file, 'r') as f :
+	# 	ids = [] 
+	# 	lines = f.read().split('\n')
+	# 	for line in lines : 
+	# 		ids.append(line.split('\t')[0].split(':')[-1])
+	# 	print("\tgot the ids")
 
-		with open(incorrect_nouns_ids_file, 'w') as f :
-			f.write('')
-		with open(incorrect_nouns_ids_file, 'a') as f : 
-			for id in ids : 
-				f.write(str(id) + '\n') 
+	# 	with open(incorrect_nouns_ids_file, 'w') as f :
+	# 		f.write('')
+	# 	with open(incorrect_nouns_ids_file, 'a') as f : 
+	# 		for id in ids : 
+	# 			f.write(str(id) + '\n') 
 		
-		print('\tdone writing ids to incorrect_nouns_ids_file')
-	print('Log : load_data_without_nouns number of products without nouns : ' + str(number_of_products_without_nouns))
+	# 	print('\tdone writing ids to incorrect_nouns_ids_file')
+	# print('Log : load_data_without_nouns number of products without nouns : ' + str(number_of_products_without_nouns))
 
-	number_of_products_without_nouns = ''
-	with open(correct_nouns_ag_output_file, 'r') as f : 
-		number_of_products_without_nouns = len(f.read().split('\n'))
-	with open(correct_nouns_ag_output_file, 'r') as f :
-		ids = [] 
-		lines = f.read().split('\n')
-		for line in lines : 
-			ids.append(line.split('\t')[0].split(':')[-1])
+	# number_of_products_without_nouns = ''
+	# with open(correct_nouns_ag_output_file, 'r') as f : 
+	# 	number_of_products_without_nouns = len(f.read().split('\n'))
+	# with open(correct_nouns_ag_output_file, 'r') as f :
+	# 	ids = [] 
+	# 	lines = f.read().split('\n')
+	# 	for line in lines : 
+	# 		ids.append(line.split('\t')[0].split(':')[-1])
 
-	try : 
-		os.remove(correct_nouns_ids_file)
-	except OSError : 
-		pass
-	with open(correct_nouns_ids_file, 'a') as f: 
-		for id in ids : 
-			f.write(str(id) + '\n')
-	print('Log : load_data_with_nouns : number of products with nouns : ' + str(number_of_products_without_nouns))
+	# try : 
+	# 	os.remove(correct_nouns_ids_file)
+	# except OSError : 
+	# 	pass
+	# with open(correct_nouns_ids_file, 'a') as f: 
+	# 	for id in ids : 
+	# 		f.write(str(id) + '\n')
+	# print('Log : load_data_with_nouns : number of products with nouns : ' + str(number_of_products_without_nouns))
 	
 	print('Log : load_data_without_nouns : DONE')
